@@ -3,10 +3,11 @@ import ccxt
 import Trade
 import Trend
 
-from get_data import pull_next_history
+from get_data import pull_next_history, print_total_history
 from Options import Option, get_option
 
 def main():
+  print_total_history()
   trend = Trend.Trend()
   gen = pull_next_history()
   debug = True
@@ -23,7 +24,7 @@ def main():
   ###
   ## START TRADING STRATEGIE ##
   ###
-  treshold = 50
+  treshold = 500
   sell_amount_btc = -1
   buy_amount_usd = 10
 
@@ -68,7 +69,7 @@ def main():
           sum_all += historical_price
           mean = sum_all / len(open_price_list)
         trend.update_trend(open_price)
-        if open_price < mean and trend.get_trend() > 3:
+        if open_price > 1 * mean and trend.get_trend() > 5:
           amount = Trade.trade("USD", "BTC", open_price, buy_amount_usd, False, True)
           if amount[0] > 0:
             buy_count += 1

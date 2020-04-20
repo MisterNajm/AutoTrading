@@ -17,7 +17,7 @@ def print_total_history():
 
 def pull_next_history():
   cursor = connection.cursor()
-  SQL_STATEMENT = "SELECT * FROM history_minute LIMIT 50000";
+  SQL_STATEMENT = "SELECT * FROM history_minute";
   cursor.execute(SQL_STATEMENT)
   date = datetime.datetime(2018, 5, 3) 
   time = 0
@@ -41,12 +41,12 @@ def check_mean_open(start = 1, end = 500):
 def generate_history():
   connection = sqlite3.connect("history.db")
   cursor = connection.cursor()
-  SQL_STATEMENT = "DROP TABLE history_minute;"
+  '''  SQL_STATEMENT = "DROP TABLE history_minute;"
 
   try:
     cursor.execute(SQL_STATEMENT)
   except:
-    pass
+    pass'''
 
   SQL_STATEMENT = """
     CREATE TABLE history_minute (
@@ -76,7 +76,7 @@ def generate_history():
   })
 
   now = exchange.milliseconds()
-  since = exchange.parse8601('2020-01-01T00:00:00Z')
+  since = exchange.parse8601('2020-03-23T07:00:00Z')
   symbol = 'BTC/USDT'
   timeframe = '1m'
   loopvar = 0
@@ -94,7 +94,7 @@ def generate_history():
       cursor.execute(SQL_STATEMENT)
     loopvar += 1
     print(pd.read_sql_query("SELECT COUNT(*) FROM history_minute", connection))
-    if(loopvar > 200):
+    if(loopvar > 72):
       connection.commit()
       break
 

@@ -1,18 +1,14 @@
 import sqlite3
-import Market
 
+connection = sqlite3.connect("crypto_trading.db", isolation_level=None)
+connection.execute('pragma journal_mode=wal')
 
-
-##TODO
-##Funktion ist scheiße, man muss die Umrechnungsquoten noch mit einbeziehen
-###
-# origin_amount auf unter 0, falls alles verkauft werden soll.
-#
-###
-def trade(origin, target, price, origin_amount=-1, reverse=False):
-    connection = sqlite3.connect("crypto_trading.db")
+def trade(origin, target, price, origin_amount=-1, reverse=False, spendall_if_unsufficient=False):
+    if(origin_amount == 0):
+      return 0,0
+    connection.execute("BEGIN")
     cursor = connection.cursor()
-    SQL_STATEMENT = "SELECT origin_amount FROM wallet WHERE id = '%s'" % origin
+    SQL_STATEMENT = "SELECT origin_amount FROM wallet WHERE id = '%s';" % origin
     cursor.execute(SQL_STATEMENT)
     balanceOrigin = cursor.fetchone()[0]
     if origin_amount < 0:
@@ -23,14 +19,19 @@ def trade(origin, target, price, origin_amount=-1, reverse=False):
 
     target_amount = origin_amount / price
     if reverse:
-      target_amount = origin_amount * price
-    SQL_STATEMENT = "SELECT origin_amount FROM wallet WHERE id = '%s'" % target
+      target_amount = (origin_amount - (origin_amount * 0.001)) * price
+    SQL_STATEMENT = "SELECT origin_amount FROM wallet WHERE id = '%s';" % target
     cursor.execute(SQL_STATEMENT)
     balanceTarget = cursor.fetchone()[0]
 
     if (origin_amount > balanceOrigin):
+      if not spendall_if_unsufficient:
         raise NameError("Bruh du hast nicht genug $$$ :<( Dir fehlen %0.20f %s" % ((balanceOrigin - origin_amount), origin))
         return
+      else:
+        connection.commit()
+        return trade(origin, target, price, balanceOrigin - origin_amount)
+    
     SQL_STATEMENT = "UPDATE wallet SET origin_amount = %0.20f WHERE id = '%s'" % (
         (balanceOrigin - origin_amount), origin)
     cursor.execute(SQL_STATEMENT)
@@ -48,29 +49,23 @@ def trade(origin, target, price, origin_amount=-1, reverse=False):
   );
   """ % (price, target_amount, origin, target)
     cursor.execute(SQL_STATEMENT)
-
-    #TODO: Verification
     connection.commit()
-    connection.close()
     if(origin_amount < 0):
       return target_amount, balanceOrigin
     else:
       return target_amount, origin_amount
 
 
-def get_balance(id=""):
-    connection = sqlite3.connect("crypto_trading.db")
+def get_balance(id="*"):
     cursor = connection.cursor()
-
-    if id == "":
-        id = '*'
     SQL_STATEMENT = "SELECT %s FROM wallet;" % (id)
     cursor.execute(SQL_STATEMENT)
     returnVal = cursor.fetchall()
-    connection.commit()
-    connection.close()
-    return returnVal
 
+    if(returnVal[0][1] > 100):
+      return "\033[92m%s%s" % (returnVal, "\033[0;0m")
+    if(returnVal[0][1] < 100):
+      return "\033[91m%s%s" % (returnVal, "\033[0;0m")
 
 def initialize():
     connection = sqlite3.connect("crypto_trading.db")
@@ -83,6 +78,8 @@ def initialize():
         cursor.execute(SQL_STATEMENT)
     connection.commit()
     connection.close()
+
+
 
 ## Not required, only if db is deleted.
 def create():

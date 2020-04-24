@@ -2,16 +2,22 @@ import sqlite3
 import ccxt
 import pandas as pd
 import datetime
+from Options import Option, get_option
 
 
-connection = sqlite3.connect("history.db", isolation_level=None)
-connection.execute('pragma journal_mode=wal')
-def get_current():
-  pass
+
+def init_conn():
+  connection = sqlite3.connect("history.db", isolation_level=None)
+  connection.execute('pragma journal_mode=wal')
+  return connection
+
+connection = init_conn()
 
 def print_total_history():
   connection = sqlite3.connect("history.db")
-  print(pd.read_sql_query("SELECT * FROM history_minute", connection))
+  if get_option(Option.debug):
+    print(Option.debug)
+    print(pd.read_sql_query("SELECT * FROM history_minute", connection))
   connection.commit()
   connection.close()
 
@@ -27,8 +33,38 @@ def pull_next_history():
     if time > 1439:
       time = 0
       date = datetime.datetime.fromtimestamp(entry[1]/1000.0)
-      print("\n\n%s\n" % date)
+      if get_option(Option.debug):
+        print("\n\n%s\n" % date)
     yield entry
+
+def persist_results(result_usd, stoploss, takeprofit, trend, treshold, buys, sells, stoplosses, takeprofits, misc="Empty"):
+  connection = init_conn()
+  cursor = connection.cursor()
+  SQL_STATEMENT = """
+    CREATE TABLE history_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	  result_usd REAL,
+	  stoploss INTEGER,
+    takeprofit INTEGER,
+    trend INTEGER,
+    treshold INTEGER,
+    buys INTEGER,
+    sells INTEGER,
+    stoplosses INTEGER,
+    takeprofits INTEGER,
+    misc TEXT,
+    );"""
+  try:
+    cursor.execute(SQL_STATEMENT)
+  except:
+    pass
+
+  SQL_STATEMENT = "INSERT INTO history_results(result_usd, stoploss, takeprofit, trend, treshold,buys, sells, stoplosses, takeprofits, misc) VALUES (%20f, %d, %d, %d, %d, %d, %d, %d, %d, %s);" % (result_usd, stoploss, takeprofit, trend, treshold, buys, sells, stoplosses, takeprofits, misc)
+  cursor.execute(SQL_STATEMENT)
+  connection.commit()
+  print(pd.read_sql_query("SELECT * FROM history_results;", connection))
+  
+  connection.close()
 
 def check_mean_open(start = 1, end = 500):
   connection = sqlite3.connect("history.db")

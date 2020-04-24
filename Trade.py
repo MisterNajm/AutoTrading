@@ -4,7 +4,7 @@ connection = sqlite3.connect("crypto_trading.db", isolation_level=None)
 connection.execute('pragma journal_mode=wal')
 
 def trade(origin, target, price, origin_amount=-1, reverse=False, spendall_if_unsufficient=False):
-    if(origin_amount == 0):
+    if(origin_amount == 0.0):
       return 0,0
     connection.execute("BEGIN")
     cursor = connection.cursor()
@@ -17,7 +17,7 @@ def trade(origin, target, price, origin_amount=-1, reverse=False, spendall_if_un
     #origin_amount: Auszugebende Anzahl Origin Währung
     #Price: Momentaner Tauschpreis
 
-    target_amount = origin_amount / price
+    target_amount = (origin_amount - (origin_amount * 0.001)) / price
     if reverse:
       target_amount = (origin_amount - (origin_amount * 0.001)) * price
     SQL_STATEMENT = "SELECT origin_amount FROM wallet WHERE id = '%s';" % target
@@ -56,16 +56,21 @@ def trade(origin, target, price, origin_amount=-1, reverse=False, spendall_if_un
       return target_amount, origin_amount
 
 
-def get_balance(id="*"):
+def get_balance(id="*", numerical=False):
     cursor = connection.cursor()
     SQL_STATEMENT = "SELECT %s FROM wallet;" % (id)
     cursor.execute(SQL_STATEMENT)
     returnVal = cursor.fetchall()
 
+    if numerical:
+      return returnVal
+
     if(returnVal[0][1] > 100):
       return "\033[92m%s%s" % (returnVal, "\033[0;0m")
     if(returnVal[0][1] < 100):
       return "\033[91m%s%s" % (returnVal, "\033[0;0m")
+
+
 
 def initialize():
     connection = sqlite3.connect("crypto_trading.db")

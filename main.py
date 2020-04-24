@@ -2,15 +2,16 @@ import time
 import ccxt
 import Trade
 import Trend
-
-from get_data import pull_next_history, print_total_history
+import random
+from get_data import pull_next_history, print_total_history, persist_results, init_conn
 from Options import Option, get_option
 
-def main():
+def main(stoploss=0.05, takeprofit=0.1, treshold = 250):
+  init_conn()
   print_total_history()
   trend = Trend.Trend()
   gen = pull_next_history()
-  debug = True
+  debug = get_option(Option.debug)
   Trade.create()
   Trade.initialize()
 
@@ -24,19 +25,20 @@ def main():
   ###
   ## START TRADING STRATEGIE ##
   ###
-  treshold = 500
+  #treshold = 250
   sell_amount_btc = -1
-  buy_amount_usd = 10
-
+  buy_amount_usd = -1
+  bought_at = 0
   buy_count = 0
   sell_count = 0
   open_price_list = []
   step = 0
-
+  take_profit_counter = 0
+  stop_loss_counter = 0
   while True:
       ##Use Delay -> Live Data, 1-2 seconds per pull
       if not disable_delay:
-        print("Test")
+        print("USING LIVE DATA")
         time.sleep(delay) # rate limit
         orderbook = exchange.fetch_order_book('BTC/USDT')
         bid = orderbook['bids'][0][0] if len (orderbook['bids']) > 0 else None
@@ -51,8 +53,7 @@ def main():
 
         if(current == "END"):
           Trade.trade("BTC", "USD", open_price_list[-1], sell_amount_btc, True)
-          print("2")
-          print("End. Balance is %s. %s Buys, %s Sells." % (Trade.get_balance(), buy_count, sell_count))
+          print("End. Balance is %s. %s Buys, %s Sells. Takeprofit: %s Stoploss: %s "% (Trade.get_balance(), buy_count, sell_count, take_profit_counter, stop_loss_counter))
           break
   
         while len(open_price_list) < treshold:
@@ -68,22 +69,49 @@ def main():
         for historical_price in open_price_list:
           sum_all += historical_price
           mean = sum_all / len(open_price_list)
+        
         trend.update_trend(open_price)
-        if open_price > 1 * mean and trend.get_trend() > 5:
-          amount = Trade.trade("USD", "BTC", open_price, buy_amount_usd, False, True)
+        if open_price > 1.005 * mean and trend.get_trend() > 1:
+          amount = Trade.trade("USD", "BTC", open_price, buy_amount_usd, False, False)
           if amount[0] > 0:
             buy_count += 1
+            bought_at = open_price
             if debug:
               print("Bought at %s$. %s" % (open_price, Trade.get_balance()))
-        if open_price > 1 * mean and trend.get_trend() < -5:
-          amount=Trade.trade("BTC", "USD", open_price, sell_amount_btc, True)
+        #Takeprofit
+        if open_price > 1.1 * bought_at:
+          
+          amount=Trade.trade("BTC", "USD", open_price, sell_amount_btc, True, False)
+
+          if amount[0] > 0:
+            print(Trade.get_balance())
+            sell_count +=1
+            take_profit_counter += 1
+            if debug:
+              print("[TAKEPROFIT] Sold at %s$. %s" % (open_price, Trade.get_balance()))
+          
+        #Stoploss @ 5%
+        if open_price < 0.95 * bought_at:
+          amount=Trade.trade("BTC", "USD", open_price, sell_amount_btc, True, False)
           if amount[0] > 0:
             sell_count +=1
+            stop_loss_counter += 1
             if debug:
-              print("Sold at %s$. %s" % (open_price, Trade.get_balance()))
-      #if(amount > 0):
+              print("[STOPLOSS] Sold at %s$. %s" % (open_price, Trade.get_balance()))
+  if(get_option(Option.persist_results)):
+    print("Persisted")
+    persist_results(Trade.get_balance("*", True)[0][1], stoploss, takeprofit, trend.get_trend(), treshold, buy_count, sell_count, take_profit_counter, stop_loss_counter, "Automated with random")
 
-main()
+
+tresholdlist = [1, 5, 10,20, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 2000, 4000, 8000, 10000]
+stoplosslist = [0.01, 0, 0.02, 0.03, 0.04, 0.05, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3]
+takeprofitlist = [0.01, 0, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 0.9, 0.25, 0.07]
+
+run = 0
+while True:
+  run += 1
+  print("Run %d" % run)
+  main(random.choice(stoplosslist), random.choice(takeprofitlist), random.choice(tresholdlist))
 
 
 
